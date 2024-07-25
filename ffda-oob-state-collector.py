@@ -100,6 +100,8 @@ if __name__ == '__main__':
 
     state_collector = StateCollector(
         udp_listen_address=args.udp_listen_address,
-        tcp_listen_address=args.tcp_listen_address
+        udp_port=args.udp_listen_port,
+        tcp_listen_address=args.tcp_listen_address,
+        tcp_port=args.tcp_listen_port
     )
     state_collector.start_network()
