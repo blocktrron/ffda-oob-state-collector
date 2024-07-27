@@ -41,7 +41,7 @@ class StateReporterListener(DatagramProtocol):
         if protocol_version == 1:
             host_id = int.from_bytes(data[1:3], 'big', signed=False)
             soc_value = int.from_bytes(data[3:4], 'big', signed=False)
-            charging_value = data[1] & 1
+            charging_value = data[4] & 1
             temperature_value = int.from_bytes(data[5:6], 'big', signed=True)
             last_contact_value = time.time()
 
