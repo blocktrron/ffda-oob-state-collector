@@ -7,7 +7,7 @@ from prometheus_client import Gauge
 from prometheus_client.twisted import MetricsResource
 from twisted.web.server import Site
 from twisted.web.resource import Resource
-from twisted.internet import reactor
+from twisted.internet import reactor, task
 from twisted.internet.protocol import DatagramProtocol
 
 
@@ -18,6 +18,22 @@ class StateCollectorMetrics:
         self.charging = Gauge('charging', 'Charging status', metric_labels)
         self.temperature = Gauge('temperature', 'Temperature in celsius', metric_labels)
         self.last_contact = Gauge('last_contact', 'Last contact', metric_labels)
+
+    def cleanup_expired(self, max_age: int):
+        # ToDo: Make this nicer by tracking statistics in our own data structure
+        # and only always fully update the Prometheus metrics from that data structure.
+        max_last_contact = time.time() - max_age
+
+        to_remove = []
+        for labels in self.last_contact._metrics:
+            if self.last_contact._metrics[labels]._value.get() < max_last_contact:
+                to_remove.append(labels)
+
+        for labels in to_remove:
+            self.soc.remove(*labels)
+            self.charging.remove(*labels)
+            self.temperature.remove(*labels)
+            self.last_contact.remove(*labels)
 
 
 class StateReporterListener(DatagramProtocol):
@@ -61,7 +77,7 @@ class StateReporterListener(DatagramProtocol):
 
 class StateCollector:
     def __init__(self, tcp_port: int = 9091, udp_port: int = 1234, tcp_listen_address: str = None,
-                 udp_listen_address: str = None):
+                 udp_listen_address: str = None, statistics_timeout: int = 900):
         self.last_contact = None
         self.temperature = None
         self.charging = None
@@ -70,6 +86,7 @@ class StateCollector:
         self.udp_port = udp_port
         self.tcp_listen_address = tcp_listen_address
         self.udp_listen_address = udp_listen_address
+        self.statistics_timeout = statistics_timeout
 
         self.metrics = StateCollectorMetrics()
         self.state_reporter_listener = StateReporterListener(self.metrics)
@@ -77,6 +94,10 @@ class StateCollector:
     def start_network(self):
         root = Resource()
         root.putChild(b'metrics', MetricsResource())
+
+        # Cleanup expired metrics every 10 minutes
+        l = task.LoopingCall(self.metrics.cleanup_expired, self.statistics_timeout)
+        l.start(30)
 
         # TCP HTTP metrics endpoint
         factory = Site(root)
@@ -96,12 +117,14 @@ if __name__ == '__main__':
     parser.add_argument('--udp-listen-address', type=str, help='UDP listen address', default="")
     parser.add_argument('--tcp-listen-port', type=int, help='TCP port', default=9091)
     parser.add_argument('--udp-listen-port', type=int, help='UDP port', default=1234)
+    parser.add_argument('--statistics-timeout', type=int, help='Timeout for statistics', default=900)
     args = parser.parse_args()
 
     state_collector = StateCollector(
         udp_listen_address=args.udp_listen_address,
         udp_port=args.udp_listen_port,
         tcp_listen_address=args.tcp_listen_address,
-        tcp_port=args.tcp_listen_port
+        tcp_port=args.tcp_listen_port,
+        statistics_timeout=args.statistics_timeout
     )
     state_collector.start_network()
