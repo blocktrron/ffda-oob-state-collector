@@ -4,9 +4,13 @@ version = "0.1.0"
 description = ""
 authors = ["David Bauer <mail@david-bauer.net>"]
 readme = "README.md"
+packages = [
+    { include = "ffda_oob_state_collector", from = "." },
+]
 
 [tool.poetry.dependencies]
 python = "^3.12"
+prometheus-client = "^0.20.0"
 
 
 [build-system]
