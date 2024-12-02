@@ -10,7 +10,7 @@ packages = [
 
 [tool.poetry.dependencies]
 python = "^3.12"
-prometheus-client = "^0.20.0"
+prometheus-client = "^0.21.0"
 
 
 [build-system]
